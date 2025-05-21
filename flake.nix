@@ -20,7 +20,7 @@
   outputs = { self, nixpkgs, home-manager, ... }@inputs:
     let
       # Define supported systems (add others like aarch64-linux for Raspberry Pi)
-      systems = [ "x86_64-linux" "aarch64-linux", "x86_64" ];
+      systems = [ "x86_64-linux" "aarch64-linux" "x86_64" ];
 
       # Helper function to generate home-manager configurations for each system
       mkHome = system:
