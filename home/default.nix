@@ -15,7 +15,7 @@
     ./common.nix
     ./shells/zsh.nix
     ./editors/vscode.nix
-    ./editors/neovim.nix
+    ./editors/nvim.nix
     ./tools/git.nix
     ./tools/node.nix
     ./tools/misc.nix
