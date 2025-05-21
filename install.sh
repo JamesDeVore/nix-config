@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# Warn if not running under bash
+if [ -z "$BASH_VERSION" ]; then
+  echo "Error: This script must be run with bash."
+  echo "Please run it as: ./install.sh"
+  exit 1
+fi
+
 # Check if bash is installed
 if ! command -v bash &> /dev/null; then
     echo "Error: bash is not installed. Please install bash before running this script."
