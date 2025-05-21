@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+# Check if bash is installed
+if ! command -v bash &> /dev/null; then
+    echo "Error: bash is not installed. Please install bash before running this script."
+    echo "You can install bash using your system's package manager:"
+    echo "  - For Debian/Ubuntu: sudo apt-get install bash"
+    echo "  - For Fedora/RHEL: sudo dnf install bash"
+    echo "  - For Arch Linux: sudo pacman -S bash"
+    exit 1
+fi
+
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
