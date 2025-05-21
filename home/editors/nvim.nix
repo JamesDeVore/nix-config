@@ -1,86 +1,76 @@
 # /my-nix-config/home/editors/neovim.nix (or lunarvim.nix)
-{ pkgs, config, lib, inputs, ... }:
+{ pkgs, lib, config, ... }: # Make sure lib and config are available
 
 let
-  # Use a specific Neovim package.
-  # For very recent Neovim, you might use neovim-nightly or an overlay.
-  # Check LunarVim's current Neovim version requirements.
-  # For example, if nixpkgs.neovim is recent enough:
-  neovimPackage = pkgs.neovim;
-  # Or, if you added the neovim-nightly-overlay to your flake.nix:
-  # neovimPackage = inputs.neovim-nightly-overlay.packages.${pkgs.system}.default;
-
+  # ... (your neovimPackage and dependency definitions from before)
+  neovimPackage = pkgs.neovim; # Or your chosen Neovim package
 in
 {
-  # Install Neovim
+  # Install Neovim (as before)
   programs.neovim = {
     enable = true;
     package = neovimPackage;
-    defaultEditor = true; # Optional: sets EDITOR=nvim
-    vimAlias = true;      # Optional: aliases vim=nvim
+    defaultEditor = true;
+    vimAlias = true;
   };
 
-  # Install LunarVim's dependencies
-  # Check LunarVim's documentation for the full, up-to-date list!
+  # Install LunarVim's dependencies (as before)
   home.packages = with pkgs; [
-    # Core requirements
     git
     make
     unzip
-    ripgrep # For searching
-    fd      # For finding files
-
-    # Python support for Neovim and plugins
+    ripgrep
+    fd
     python3
     python3Packages.pynvim
-
-    # Node.js support for Neovim Language Server Protocol (LSP) & formatters
-    nodejs_20 # Or another recent version
-    nodePackages.npm # Often needed for LSPs or tools installed via Mason/npm
-
-    # Rust support (for tree-sitter, some LSPs, Telescope)
+    nodejs_20 # Or your chosen Node.js version
+    nodePackages.npm
     cargo
-
-    # Compilers (gcc or clang, often needed for building tree-sitter parsers or other native extensions)
-    gcc # or clang
-
-    # Optional but recommended for a better experience with LSPs / formatters
-    # Check what LunarVim's Mason installs or what you plan to use:
-    # Example Language Servers (LunarVim's Mason often handles these, but base tools can be useful)
-    # lua-language-server
-    # marksman # For markdown
-    # nodePackages.typescript-language-server
-    # nodePackages.vscode-json-languageserver
-    # nixd # Nix Language Server (if you use it)
-
-    # Formatters
-    stylua # For Lua
-    shfmt  # For shell scripts
-    prettierd # For web dev files
+    gcc
+    # Ensure curl is also listed here if not already pulled in by something else,
+    # as the activation script will use it.
+    curl
   ];
 
-  # Ensure ~/.local/bin is in PATH, as LunarVim installs 'lvim' there.
-  # Home Manager usually does this by default if programs are installed there,
-  # but it's good to be aware. You can explicitly add it if needed:
-  # home.sessionPath = [ "$HOME/.local/bin" ];
-
-  # Optional: If you want to manage your custom LunarVim config.lua with Nix
+  # Optional: Manage your custom LunarVim config.lua (as before)
   xdg.configFile."lvim/config.lua" = {
-    source = ./lvim-config/config.lua; # Create this file in your Nix config repo
-    # text = '' -- Or define it inline
-    --   -- Your LunarVim specific config overrides here
-    --   -- For example:
-    --   -- lvim.log.level = "warn"
-    --   -- lvim.format_on_save.enabled = true
-    --   -- table.insert(lvim.plugins, {
-    --   --   "folke/tokyonight.nvim",
-    --   --   lazy = false,
-    --   --   priority = 1000,
-    --   --   config = function()
-    --   --     vim.cmd([[colorscheme tokyonight]])
-    --   --   end,
-    --   -- })
-    -- '';
-    recursive = false; # Ensure only this file is managed, not the whole lvim dir initially
+    source = ./lvim-config/config.lua; # Or use `text` attribute
+    # ...
   };
+
+  # Activation script to install LunarVim if not already present
+  home.activation.installLunarVim = lib.hm.dag.entryAfter ["writeBoundary"] ''
+    # Define paths for checking LunarVim's presence
+    # Note: $HOME is automatically set by Home Manager in this context
+    LVIM_EXECUTABLE="$HOME/.local/bin/lvim"
+    LVIM_CONFIG_DIR="$HOME/.config/lvim"
+    LVIM_SHARE_DIR="$HOME/.local/share/lunarvim"
+
+    # Check if lvim executable or its primary share directory exists
+    if [ ! -f "$LVIM_EXECUTABLE" ] && [ ! -d "$LVIM_SHARE_DIR" ]; then
+      echo "LunarVim not found at $LVIM_EXECUTABLE or $LVIM_SHARE_DIR. Attempting installation..."
+
+      # Ensure ~/.local/bin exists, as the installer expects it
+      mkdir -p "$HOME/.local/bin"
+
+      # Command to install LunarVim (non-interactively)
+      # Using the --yes flag for non-interactive installation
+      # Ensure pkgs.bash and pkgs.curl are available.
+      # They are usually on PATH if included in home.packages.
+      # Using explicit paths for robustness:
+      echo "Running LunarVim installer script..."
+      ${pkgs.bash}/bin/bash <(${pkgs.curl}/bin/curl -s https://raw.githubusercontent.com/LunarVim/LunarVim/rolling/utils/installer/install.sh) --yes
+
+      # Check if the lvim executable was created after installation
+      if [ -f "$LVIM_EXECUTABLE" ]; then
+        echo "LunarVim installation script finished. lvim executable found at $LVIM_EXECUTABLE."
+        echo "You might need to run 'lvim' once manually to complete setup (e.g., plugin installation)."
+      else
+        echo "LunarVim installation script finished, but $LVIM_EXECUTABLE was not found. Please check for errors."
+      fi
+    else
+      echo "LunarVim already detected at $LVIM_EXECUTABLE or $LVIM_SHARE_DIR. Skipping installation."
+    fi
+  '';
 }
+
