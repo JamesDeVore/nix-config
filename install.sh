@@ -165,21 +165,27 @@ if command -v apt-get &> /dev/null; then
 elif command -v dnf &> /dev/null; then
   PACKAGE_MANAGER="dnf"
 else
-  log "ERROR: Neither apt nor dnf found. Please install git and curl manually and re-run."
+  log "ERROR: Neither apt nor dnf found. Please install git, curl, and jq manually and re-run."
   exit 1
 fi
 
-# 1. Install Prerequisites (git and curl)
-log "Installing prerequisites (git and curl)..."
-if ! command -v git &> /dev/null || ! command -v curl &> /dev/null; then
+# 1. Install Prerequisites (git, curl, and jq)
+log "Installing prerequisites (git, curl, and jq)..."
+if ! command -v git &> /dev/null || ! command -v curl &> /dev/null || ! command -v jq &> /dev/null; then
+  echo "Attempting to install missing prerequisites..."
   if [ "$PACKAGE_MANAGER" = "apt" ]; then
     sudo apt-get update
-    sudo apt-get install -y git curl
+    sudo apt-get install -y git curl jq
   elif [ "$PACKAGE_MANAGER" = "dnf" ]; then
-    sudo dnf install -y git curl
+    sudo dnf install -y git curl jq
+  fi
+  # Verify installation
+  if ! command -v git &> /dev/null || ! command -v curl &> /dev/null || ! command -v jq &> /dev/null; then
+    log "ERROR: Failed to install all prerequisites (git, curl, jq). Please install them manually and re-run."
+    exit 1
   fi
 else
-  echo "Git and curl are already installed."
+  echo "Git, curl, and jq are already installed."
 fi
 
 # Call SSH key setup after prerequisites are installed
@@ -284,12 +290,16 @@ cd "$FLAKE_REPO_ROOT" # Ensure we are in the flake's directory
 if [ -f "flake.lock" ]; then
   if [ ! -s "flake.lock" ] || ! jq empty flake.lock >/dev/null 2>&1; then
     echo "flake.lock is empty or not valid JSON. Deleting and regenerating..."
-    rm flake.lock
-    nix flake update
+    rm -f flake.lock # Use rm -f to avoid error if it was a broken symlink etc.
+    nix flake update --log-format internal-json -v # Added verbosity and better log format for potential debug
+  else
+    echo "flake.lock found and appears to be valid JSON."
+    # Optionally, you might still want to run 'nix flake update' here if you always want the latest.
+    # For now, we only update if it was broken or missing.
   fi
 else
   echo "flake.lock not found. Generating a new one..."
-  nix flake update
+  nix flake update --log-format internal-json -v # Added verbosity
 fi
 
 # Construct the Flake output name if not set directly
