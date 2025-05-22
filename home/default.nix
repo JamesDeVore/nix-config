@@ -152,8 +152,6 @@
       core.editor = "nvim";
       init.defaultBranch = "main";
       pull.rebase = true;
-      # Prefer SSH for GitHub URLs
-      "url \"git@github.com:\".insteadOf" = "https://github.com/";
     };
   };
 
