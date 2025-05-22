@@ -124,7 +124,8 @@ else
   # Multi-user Nix installation (will be interactive)
   # Consider --no-daemon for a non-interactive single-user install if preferred,
   # but multi-user is generally recommended.
-  sh <(curl -L https://nixos.org/nix/install) --daemon
+  # Automate 'yes' prompts for the Nix installer
+  yes | sh <(curl -L https://nixos.org/nix/install) --daemon
   echo "Nix installation script finished."
   echo "IMPORTANT: You might need to source the Nix environment or start a new shell."
   # Attempt to source it for the current script session

@@ -4,6 +4,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11"; # Latest stable release
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";  # Add unstable channel
     home-manager = {
       url = "github:nix-community/home-manager/release-23.11";
       inputs.nixpkgs.follows = "nixpkgs"; # Ensures home-manager uses the same nixpkgs
@@ -14,19 +15,31 @@
     #   inputs.nixpkgs.follows = "nixpkgs";
     # };
     # For Neovim plugins (example with nix-community/neovim-nightly-overlay)
-    # neovim-nightly-overlay.url = "github:nix-community/neovim-nightly-overlay";
+    neovim-nightly-overlay.url = "github:nix-community/neovim-nightly-overlay";
+    # Ensure the overlay uses unstable nixpkgs for its build dependencies
+    neovim-nightly-overlay.inputs.nixpkgs.follows = "nixpkgs-unstable";
   };
 
-  outputs = { self, nixpkgs, home-manager, ... }@inputs:
+  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, neovim-nightly-overlay, ... }@inputs:
     let
       # Define supported systems (add others like aarch64-linux for Raspberry Pi)
       systems = [ "x86_64-linux" "aarch64-linux" ];
 
       # Helper function to generate home-manager configurations for each system
       mkHome = system:
+        let
+          stablePkgs = nixpkgs.legacyPackages.${system};
+          pkgsForNeovim = import nixpkgs-unstable {
+            inherit system;
+            overlays = [ neovim-nightly-overlay.overlays.default ];
+          };
+        in
         home-manager.lib.homeManagerConfiguration {
-          pkgs = nixpkgs.legacyPackages.${system};
-          extraSpecialArgs = { inherit inputs system; }; # Pass inputs to your home modules
+          pkgs = stablePkgs;
+          extraSpecialArgs = {
+            inherit inputs system;
+            pkgsWithNightlyNvim = pkgsForNeovim;
+          };
           modules = [
             ./home/default.nix
             # You can add machine-specific modules here if needed:
