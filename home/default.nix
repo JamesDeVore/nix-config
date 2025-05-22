@@ -146,12 +146,14 @@
   # Git Configuration
   programs.git = {
     enable = true;
-    userName = "James";
     userEmail = "jdevore4592@gmail.com";
+    userName = "James";
     extraConfig = {
       core.editor = "nvim";
       init.defaultBranch = "main";
       pull.rebase = true;
+      # Prefer SSH for GitHub URLs
+      "url.git@github.com:.insteadOf" = "https://github.com/";
     };
   };
 

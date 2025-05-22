@@ -26,16 +26,18 @@ set -e
 ORIGINAL_HOME="$HOME"
 LOCAL_NIX_HOME="$ORIGINAL_HOME/local-nix-home"
 
-if [ ! -d "$LOCAL_NIX_HOME" ]; then
-  echo "Creating a new local home directory at $LOCAL_NIX_HOME"
-  mkdir -p "$LOCAL_NIX_HOME"
-  echo "Copying files from $SCRIPT_DIR to $LOCAL_NIX_HOME (this may take a while)..."
-  rsync -a --exclude 'local-nix-home' --exclude '.cache' --exclude 'proc' --exclude 'sys' --exclude 'dev' "$SCRIPT_DIR/" "$LOCAL_NIX_HOME/"
+# This variable will be used as the root for the flake configuration.
+FLAKE_REPO_ROOT="$LOCAL_NIX_HOME"
+echo "Nix Flake configuration will be cloned/updated in: $FLAKE_REPO_ROOT"
+
+# Ensure the target directory for the flake repository exists
+if [ ! -d "$FLAKE_REPO_ROOT" ]; then
+  echo "Creating Nix Flake configuration directory at $FLAKE_REPO_ROOT"
+  mkdir -p "$FLAKE_REPO_ROOT"
 fi
 
 # Don't change HOME environment variable
 # export HOME="$LOCAL_NIX_HOME"  # Remove or comment this line
-FLAKE_REPO_ROOT="$LOCAL_NIX_HOME"
 echo "Using $FLAKE_REPO_ROOT as the flake directory for this script."
 
 # --- USER CONFIGURATION: PLEASE EDIT THESE VARIABLES ---
@@ -63,6 +65,91 @@ log() {
   echo "--------------------------------------------------"
   echo "$1"
   echo "--------------------------------------------------"
+}
+
+# --- Function to setup SSH keys ---
+setup_ssh_keys() {
+  log "Setting up SSH keys for Git integration..."
+  local ssh_dir="$ORIGINAL_HOME/.ssh"
+  local id_ed25519_pub="$ssh_dir/id_ed25519.pub"
+  local id_ed25519_priv="$ssh_dir/id_ed25519"
+  local id_rsa_pub="$ssh_dir/id_rsa.pub" # Check for older RSA keys as well
+  local id_rsa_priv="$ssh_dir/id_rsa"
+
+  echo "Checking for existing SSH keys in $ssh_dir..."
+
+  if [ -f "$id_ed25519_priv" ] || [ -f "$id_rsa_priv" ]; then
+    echo "Existing SSH key(s) found."
+    if [ -f "$id_ed25519_pub" ]; then
+      echo "--------------------------------------------------"
+      echo "Your ED25519 Public Key ($id_ed25519_pub):"
+      cat "$id_ed25519_pub"
+      echo "--------------------------------------------------"
+    fi
+    if [ -f "$id_rsa_pub" ]; then
+      echo "--------------------------------------------------"
+      echo "Your RSA Public Key ($id_rsa_pub):"
+      cat "$id_rsa_pub"
+      echo "--------------------------------------------------"
+    fi
+    echo "Please ensure one of these public keys is added to your GitHub, GitLab, or other Git provider."
+    echo "You can typically add SSH keys at: https://github.com/settings/keys"
+    echo "If you need to use a specific key, ensure your SSH agent is configured or use an SSH config file."
+
+    return
+  fi
+
+  echo "No existing SSH key (id_ed25519 or id_rsa) found in $ssh_dir."
+  read -r -p "Do you want to generate a new ED25519 SSH key now? (y/N): " generate_key_prompt
+  if [[ ! "$generate_key_prompt" =~ ^[Yy]$ ]]; then
+    echo "Skipping SSH key generation. Please ensure your SSH keys are configured manually for Git integration."
+
+    return
+  fi
+
+  local email
+  # Try to get email from global git config if available, otherwise prompt
+  # This assumes git command is available (installed in prerequisites)
+  if command -v git &> /dev/null && git config --global user.email &> /dev/null; then
+    email=$(git config --global user.email)
+    echo "Using email from global git config for SSH key: $email"
+  else
+    read -r -p "Please enter your email address for the SSH key comment: " email
+  fi
+
+  if [ -z "$email" ]; then
+    echo "Email address is required for the SSH key comment. Aborting SSH key generation."
+
+    return
+  fi
+
+  mkdir -p "$ssh_dir"
+  chmod 700 "$ssh_dir"
+  
+  echo "Generating ED25519 SSH key. You will be prompted for a file and passphrase."
+  echo "It's recommended to save it to the default location ($id_ed25519_priv)."
+  echo "Using a strong passphrase is highly recommended."
+  ssh-keygen -t ed25519 -C "$email" -f "$id_ed25519_priv" # User will be prompted for passphrase
+
+  if [ -f "$id_ed25519_pub" ]; then
+    echo "--------------------------------------------------"
+    echo "New ED25519 SSH key generated successfully!"
+    echo "Your new Public Key ($id_ed25519_pub) is:"
+    cat "$id_ed25519_pub"
+    echo "--------------------------------------------------"
+    echo ""
+    echo "IMPORTANT INSTRUCTIONS:"
+    echo "1. Copy the entire public key text block above (starting with 'ssh-ed25519...' and ending with your email)."
+    echo "2. Add this public key to your GitHub account: https://github.com/settings/keys"
+    echo "   (Or to your respective Git provider like GitLab, Bitbucket, etc.)"
+    echo "3. After adding the key, you can test the connection by running:"
+    echo "     ssh -T git@github.com"
+    echo "   (Replace 'github.com' if you use a different provider)."
+    read -r -p "Press Enter to continue after you have added the key to your Git provider..."
+  else
+    echo "ERROR: SSH key generation seems to have failed. Public key file not found at $id_ed25519_pub."
+    echo "Please try generating it manually or check for errors."
+  fi
 }
 
 # Check if script is run as root, exit if so, as some steps need user context
@@ -95,26 +182,30 @@ else
   echo "Git and curl are already installed."
 fi
 
+# Call SSH key setup after prerequisites are installed
+setup_ssh_keys
+
 # 2. Create directory and clone Nix configuration repository
-# log "Cloning your Nix Flake repository..."
-# if [ -d "$FLAKE_REPO_ROOT/.git" ]; then
-#   # Ensure correct ownership
-#   sudo chown -R "$(id -u):$(id -g)" "$FLAKE_REPO_ROOT"
-#   # Mark as safe for git
-#   git config --global --add safe.directory "$FLAKE_REPO_ROOT"
-#   echo "Repository already seems to be cloned in $FLAKE_REPO_ROOT. Pulling latest changes..."
-#   cd "$FLAKE_REPO_ROOT"
-#   git pull
-# else
-#   mkdir -p "$(dirname "$FLAKE_REPO_ROOT")" # Ensure parent directory exists
-#   git clone "$GITHUB_REPO_URL" "$FLAKE_REPO_ROOT"
-#   # Ensure correct ownership
-#   sudo chown -R "$(id -u):$(id -g)" "$FLAKE_REPO_ROOT"
-#   # Mark as safe for git
-#   git config --global --add safe.directory "$FLAKE_REPO_ROOT"
-#   cd "$FLAKE_REPO_ROOT"
-# fi
-echo "Assuming repository is already present at $FLAKE_REPO_ROOT"
+log "Cloning/Updating your Nix Flake repository..."
+if [ -d "$FLAKE_REPO_ROOT/.git" ]; then
+  # Ensure correct ownership
+  sudo chown -R "$(id -u):$(id -g)" "$FLAKE_REPO_ROOT"
+  # Mark as safe for git
+  git config --global --add safe.directory "$FLAKE_REPO_ROOT"
+  echo "Repository already seems to be cloned in $FLAKE_REPO_ROOT. Pulling latest changes..."
+  cd "$FLAKE_REPO_ROOT"
+  git pull
+else
+  # Ensure parent directory exists (though mkdir -p $FLAKE_REPO_ROOT earlier should handle it)
+  mkdir -p "$(dirname "$FLAKE_REPO_ROOT")" 
+  echo "Cloning $GITHUB_REPO_URL into $FLAKE_REPO_ROOT..."
+  git clone "$GITHUB_REPO_URL" "$FLAKE_REPO_ROOT"
+  # Ensure correct ownership
+  sudo chown -R "$(id -u):$(id -g)" "$FLAKE_REPO_ROOT"
+  # Mark as safe for git
+  git config --global --add safe.directory "$FLAKE_REPO_ROOT"
+  cd "$FLAKE_REPO_ROOT"
+fi
 
 # 3. Install Nix
 log "Installing Nix package manager..."
