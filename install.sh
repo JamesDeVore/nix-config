@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # Warn if not running under bash
 if [ -z "$BASH_VERSION" ]; then
   echo "Error: This script must be run with bash."
@@ -20,6 +22,22 @@ fi
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+# Set up an isolated Nix home directory
+ORIGINAL_HOME="$HOME"
+LOCAL_NIX_HOME="$ORIGINAL_HOME/local-nix-home"
+
+if [ ! -d "$LOCAL_NIX_HOME" ]; then
+  echo "Creating a new local home directory at $LOCAL_NIX_HOME"
+  mkdir -p "$LOCAL_NIX_HOME"
+  echo "Copying files from $SCRIPT_DIR to $LOCAL_NIX_HOME (this may take a while)..."
+  rsync -a --exclude 'local-nix-home' --exclude '.cache' --exclude 'proc' --exclude 'sys' --exclude 'dev' "$SCRIPT_DIR/" "$LOCAL_NIX_HOME/"
+fi
+
+# Don't change HOME environment variable
+# export HOME="$LOCAL_NIX_HOME"  # Remove or comment this line
+FLAKE_REPO_ROOT="$LOCAL_NIX_HOME"
+echo "Using $FLAKE_REPO_ROOT as the flake directory for this script."
+
 # --- USER CONFIGURATION: PLEASE EDIT THESE VARIABLES ---
 # Your GitHub repository URL for your Nix Flake configuration
 # Example: GITHUB_REPO_URL="https://github.com/yourusername/my-nix-dots.git"
@@ -28,7 +46,7 @@ GITHUB_REPO_URL="https://github.com/JamesDevore/nix-config"
 # The local directory where your Nix configuration will be cloned.
 # This script will create this directory if it doesn't exist.
 # Example: FLAKE_REPO_ROOT="$HOME/my-nix-setup"
-FLAKE_REPO_ROOT="$HOME/nix-config" # Changed from ~/nix to avoid potential conflicts if ~/nix is special
+# FLAKE_REPO_ROOT="$HOME/nix-config" # Changed from ~/nix to avoid potential conflicts if ~/nix is special
 
 # The name of the output in your flake.nix for Home Manager.
 # This script attempts to construct it dynamically assuming a pattern like "username-architecture-linux".
@@ -78,17 +96,25 @@ else
 fi
 
 # 2. Create directory and clone Nix configuration repository
-log "Cloning your Nix Flake repository..."
-if [ -d "$FLAKE_REPO_ROOT/.git" ]; then
-  echo "Repository already seems to be cloned in $FLAKE_REPO_ROOT. Pulling latest changes..."
-  cd "$FLAKE_REPO_ROOT"
-  git pull
-else
-  mkdir -p "$(dirname "$FLAKE_REPO_ROOT")" # Ensure parent directory exists
-  git clone "$GITHUB_REPO_URL" "$FLAKE_REPO_ROOT"
-  cd "$FLAKE_REPO_ROOT"
-fi
-echo "Successfully cloned/updated repository to $FLAKE_REPO_ROOT"
+# log "Cloning your Nix Flake repository..."
+# if [ -d "$FLAKE_REPO_ROOT/.git" ]; then
+#   # Ensure correct ownership
+#   sudo chown -R "$(id -u):$(id -g)" "$FLAKE_REPO_ROOT"
+#   # Mark as safe for git
+#   git config --global --add safe.directory "$FLAKE_REPO_ROOT"
+#   echo "Repository already seems to be cloned in $FLAKE_REPO_ROOT. Pulling latest changes..."
+#   cd "$FLAKE_REPO_ROOT"
+#   git pull
+# else
+#   mkdir -p "$(dirname "$FLAKE_REPO_ROOT")" # Ensure parent directory exists
+#   git clone "$GITHUB_REPO_URL" "$FLAKE_REPO_ROOT"
+#   # Ensure correct ownership
+#   sudo chown -R "$(id -u):$(id -g)" "$FLAKE_REPO_ROOT"
+#   # Mark as safe for git
+#   git config --global --add safe.directory "$FLAKE_REPO_ROOT"
+#   cd "$FLAKE_REPO_ROOT"
+# fi
+echo "Assuming repository is already present at $FLAKE_REPO_ROOT"
 
 # 3. Install Nix
 log "Installing Nix package manager..."
@@ -162,9 +188,27 @@ fi
 log "Applying Home Manager configuration from Flake..."
 cd "$FLAKE_REPO_ROOT" # Ensure we are in the flake's directory
 
+# Check if flake.lock exists and is valid JSON
+if [ -f "flake.lock" ]; then
+  if [ ! -s "flake.lock" ] || ! jq empty flake.lock >/dev/null 2>&1; then
+    echo "flake.lock is empty or not valid JSON. Deleting and regenerating..."
+    rm flake.lock
+    nix flake update
+  fi
+else
+  echo "flake.lock not found. Generating a new one..."
+  nix flake update
+fi
+
 # Construct the Flake output name if not set directly
 if [ -z "${FLAKE_OUTPUT_NAME_STATIC+x}" ]; then # Check if FLAKE_OUTPUT_NAME_STATIC is unset
-  SYSTEM_ARCH=$(nix-shell -p nix-info --run "nix-info -m") # Get architecture like x86_64 or aarch64
+  SYSTEM_ARCH=$(uname -m)
+  case "$SYSTEM_ARCH" in
+    x86_64) SYSTEM_ARCH="x86_64" ;;
+    aarch64) SYSTEM_ARCH="aarch64" ;;
+    *) echo "Unknown architecture: $SYSTEM_ARCH"; exit 1 ;;
+  esac
+
   FLAKE_OUTPUT_NAME="${FLAKE_OUTPUT_USERNAME}-${SYSTEM_ARCH}-linux"
   echo "Constructed Flake output name: $FLAKE_OUTPUT_NAME"
 else

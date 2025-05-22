@@ -3,9 +3,9 @@
   description = "My Developer Environment";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable"; # Or a specific release branch
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11"; # Latest stable release
     home-manager = {
-      url = "github:nix-community/home-manager";
+      url = "github:nix-community/home-manager/release-23.11";
       inputs.nixpkgs.follows = "nixpkgs"; # Ensures home-manager uses the same nixpkgs
     };
     # For VSCode extensions if not all are in nixpkgs
