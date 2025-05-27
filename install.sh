@@ -111,6 +111,15 @@ fix_nix_permissions() {
     sudo chmod -R 1775 /nix/store
   fi
 
+  # Handle temporary Nix directories and tarball cache
+  echo "Fixing temporary Nix directories and tarball cache..."
+  # Clean up any existing temporary directories
+  sudo rm -rf "$HOME/.cache/nix/nix-*"
+  # Ensure tarball cache directory exists with correct permissions
+  mkdir -p "$HOME/.cache/nix/tarball-cache"
+  sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix"
+  sudo chmod -R 755 "$HOME/.cache/nix"
+
   echo "Nix permissions fixed."
 }
 
