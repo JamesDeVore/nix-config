@@ -22,6 +22,7 @@
     gnumake
     htop
     lazygit
+    lunarvim
     lua
     luajitPackages.luarocks
     nil  # Nix language server
@@ -199,83 +200,4 @@
     enable = true;
     enableZshIntegration = true;
   };
-
-  # Install LunarVim using home-manager's activation script
-  home.activation = {
-    installLunarVim = lib.hm.dag.entryAfter ["writeBoundary"] ''
-      # Ensure this directory exists for the PATH modification below
-      mkdir -p "$HOME/.local/bin"
-
-      if [ ! -d "$HOME/.local/share/lunarvim" ]; then
-        echo "Installing LunarVim..."
-        
-        # Create a temporary PATH with all necessary tools
-        # Reference the actual neovim package that will be installed by programs.neovim
-        NIX_TOOLS_PATH="${lib.makeBinPath ([config.programs.neovim.package] ++ (with pkgs; [ # Stable pkgs for other tools
-          bash
-          coreutils
-          curl
-          findutils
-          git
-          gnugrep
-          gnumake
-          gnused
-          nodejs_20
-          python3
-        ]))}"
-        # Add $HOME/.local/bin to the PATH for the installer itself
-        export PATH="$NIX_TOOLS_PATH:$HOME/.local/bin:$PATH"
-        
-        TEMP_DIR=$(mktemp -d)
-        cd $TEMP_DIR
-        
-        curl -s https://raw.githubusercontent.com/LunarVim/LunarVim/master/utils/installer/install.sh -o install.sh
-        sed -i 's/check_system_deps$/#check_system_deps/g' install.sh
-        bash install.sh --no-install-dependencies
-        
-        cd $HOME
-        rm -rf $TEMP_DIR
-      else
-        echo "LunarVim already installed, skipping installation"
-      fi
-    '';
-  };
-  
-  # Create a basic LunarVim config
-  home.file.".config/lvim/config.lua".text = ''
-    -- General
-    lvim.log.level = "warn"
-    lvim.format_on_save.enabled = true
-    lvim.colorscheme = "lunar" -- or your preferred theme like 'tokyonight'
-    
-    lvim.leader = "space"
-    
-    -- If you want to manage LSPs, formatters, linters via Nix and prevent LunarVim from auto-installing them:
-    -- lvim.lsp.automatic_servers_installation = false
-
-    lvim.plugins = {
-      {"folke/trouble.nvim"},
-      {"github/copilot.vim"}, -- If you use Copilot
-      {"nvim-treesitter/nvim-treesitter-context"},
-    }
-    
-    -- Example: if you manage rust-analyzer via Nix, skip LV's auto-config for it
-    -- vim.list_extend(lvim.lsp.automatic_configuration.skipped_servers, { "rust_analyzer" })
-    
-    local formatters = require "lvim.lsp.null-ls.formatters"
-    formatters.setup {
-      { command = "prettier", filetypes = { "typescript", "typescriptreact", "javascript", "html", "css", "yaml", "markdown", "json" } },
-      { command = "nixfmt", filetypes = { "nix" } },
-    }
-    
-    local linters = require "lvim.lsp.null-ls.linters"
-    linters.setup {
-      { command = "eslint", filetypes = { "typescript", "typescriptreact", "javascript" } },
-    }
-    
-    vim.opt.relativenumber = true
-    vim.opt.wrap = false
-    vim.opt.scrolloff = 8
-    vim.opt.sidescrolloff = 8
-  '';
 }
