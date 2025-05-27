@@ -93,8 +93,15 @@ fix_nix_permissions() {
 
   # Special handling for nix-daemon directories if they exist
   if [ -d "/nix" ]; then
-    echo "Fixing /nix directory permissions..."
+    echo "Setting up Nix profile directories..."
+    # Create the necessary directory structure
+    sudo mkdir -p "/nix/var/nix/profiles/per-user/$USER"
+    sudo mkdir -p "/nix/var/nix/gcroots/per-user/$USER"
+    
+    # Fix permissions for the per-user directories
+    echo "Fixing permissions for Nix profile directories..."
     sudo chown -R "$(id -u):$(id -g)" "/nix/var/nix/profiles/per-user/$USER"
+    sudo chown -R "$(id -u):$(id -g)" "/nix/var/nix/gcroots/per-user/$USER"
   fi
 
   # Ensure the Nix store has correct permissions
