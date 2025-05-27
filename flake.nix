@@ -15,12 +15,12 @@
     #   inputs.nixpkgs.follows = "nixpkgs";
     # };
     # For Neovim plugins (example with nix-community/neovim-nightly-overlay)
-    neovim-nightly-overlay.url = "github:nix-community/neovim-nightly-overlay";
+    # neovim-nightly-overlay.url = "github:nix-community/neovim-nightly-overlay";
     # Ensure the overlay uses unstable nixpkgs for its build dependencies
-    neovim-nightly-overlay.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    # neovim-nightly-overlay.inputs.nixpkgs.follows = "nixpkgs-unstable";
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, neovim-nightly-overlay, ... }@inputs:
+  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, ... }@inputs:
     let
       # Define supported systems (add others like aarch64-linux for Raspberry Pi)
       systems = [ "x86_64-linux" "aarch64-linux" ];
@@ -29,16 +29,11 @@
       mkHome = system:
         let
           stablePkgs = nixpkgs.legacyPackages.${system};
-          pkgsForNeovim = import nixpkgs-unstable {
-            inherit system;
-            overlays = [ neovim-nightly-overlay.overlays.default ];
-          };
         in
         home-manager.lib.homeManagerConfiguration {
           pkgs = stablePkgs;
           extraSpecialArgs = {
             inherit inputs system;
-            pkgsWithNightlyNvim = pkgsForNeovim;
           };
           modules = [
             ./home/default.nix

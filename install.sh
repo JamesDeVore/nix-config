@@ -282,6 +282,15 @@ elif [ "$NEEDS_DAEMON_RESTART" = true ]; then
   log "Nix daemon may need to be restarted manually for Flakes to be fully enabled."
 fi
 
+# Ensure the user owns their Nix cache directory
+# This can prevent permission errors during flake updates if sudo was used inappropriately before.
+if [ -d "$ORIGINAL_HOME/.cache/nix" ]; then
+  log "Ensuring current user owns $ORIGINAL_HOME/.cache/nix..."
+  sudo chown -R "$(id -u):$(id -g)" "$ORIGINAL_HOME/.cache/nix" || echo "Warning: Failed to chown $ORIGINAL_HOME/.cache/nix. This might cause issues if the directory is not writable."
+else
+  echo "$ORIGINAL_HOME/.cache/nix does not exist, skipping chown. Nix will create it."
+fi
+
 # 5. Apply Home Manager Configuration using the Flake
 log "Applying Home Manager configuration from Flake..."
 cd "$FLAKE_REPO_ROOT" # Ensure we are in the flake's directory

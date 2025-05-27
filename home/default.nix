@@ -152,19 +152,19 @@
       core.editor = "nvim";
       init.defaultBranch = "main";
       pull.rebase = true;
+      # Prefer SSH for GitHub URLs
+      "url \"git@github.com:\".insteadOf" = "https://github.com/";
     };
   };
 
-  # Neovim Configuration using neovim-nightly
+  # Neovim Configuration using stable version
   programs.neovim = {
     enable = true;
     defaultEditor = true;
     viAlias = true;
     vimAlias = true;
-    # Use neovim-nightly from the pkgs set that has the overlay applied
-    # The overlay might provide it simply as 'neovim' or 'neovim-nightly'.
-    # Let's try pkgsWithNightlyNvim.neovim
-    package = pkgsWithNightlyNvim.neovim;
+    # Use stable Neovim from nixpkgs
+    package = pkgs.neovim;
     
     # Since LunarVim manages its plugins, this can be minimal or empty
     plugins = [ ]; # Example: pkgs.vimPlugins.vim-nix if needed outside LunarVim
