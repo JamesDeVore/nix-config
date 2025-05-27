@@ -217,14 +217,17 @@ fi
 log "Installing Nix package manager..."
 if command -v nix &> /dev/null; then
   echo "Nix seems to be already installed."
+  # Fix permissions even if Nix is already installed
+  fix_nix_permissions
 else
   # Multi-user Nix installation (will be interactive)
-  # Consider --no-daemon for a non-interactive single-user install if preferred,
-  # but multi-user is generally recommended.
-  # Automate 'yes' prompts for the Nix installer
   yes | sh <(curl -L https://nixos.org/nix/install) --daemon
   echo "Nix installation script finished."
   echo "IMPORTANT: You might need to source the Nix environment or start a new shell."
+  
+  # Fix permissions after fresh install
+  fix_nix_permissions
+  
   # Attempt to source it for the current script session
   if [ -f '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
     # shellcheck source=/dev/null
@@ -351,4 +354,22 @@ echo "2. If you included the LunarVim auto-installer, run 'lvim' once manually t
 echo "3. Verify your tools and configurations are working as expected."
 
 exit 0
+
+# Function to fix Nix cache permissions
+fix_nix_permissions() {
+  log "Fixing Nix cache permissions..."
+  
+  # Create cache directory if it doesn't exist
+  mkdir -p "$HOME/.cache/nix"
+  
+  # Fix ownership of Nix cache directories
+  sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix"
+  sudo chmod -R 755 "$HOME/.cache/nix"
+  
+  # Also ensure the tarball cache directory exists and has correct permissions
+  mkdir -p "$HOME/.cache/nix/tarball-cache"
+  sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix/tarball-cache"
+  
+  echo "Nix cache permissions fixed."
+}
 
