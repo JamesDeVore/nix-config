@@ -78,11 +78,30 @@ fix_nix_permissions() {
   sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix"
   sudo chmod -R 755 "$HOME/.cache/nix"
   
-  # Also ensure the tarball cache directory exists and has correct permissions
-  mkdir -p "$HOME/.cache/nix/tarball-cache"
-  sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix/tarball-cache"
+  # Clean up and properly initialize the tarball cache
+  if [ -d "$HOME/.cache/nix/tarball-cache" ]; then
+    log "Removing existing tarball cache for clean initialization..."
+    rm -rf "$HOME/.cache/nix/tarball-cache"
+  fi
   
-  echo "Nix cache permissions fixed."
+  # Initialize a fresh tarball cache as a Git repository
+  mkdir -p "$HOME/.cache/nix/tarball-cache"
+  cd "$HOME/.cache/nix/tarball-cache"
+  git init
+  git config --local user.email "nix-cache@localhost"
+  git config --local user.name "Nix Cache"
+  touch .keep
+  git add .keep
+  git commit -m "Initialize Nix tarball cache"
+  
+  # Fix permissions on the newly created repository
+  sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix/tarball-cache"
+  sudo chmod -R 755 "$HOME/.cache/nix/tarball-cache"
+  
+  # Return to previous directory
+  cd - > /dev/null
+  
+  echo "Nix cache permissions fixed and Git repository initialized."
 }
 
 # --- Function to setup SSH keys ---
@@ -321,6 +340,11 @@ if [ -f "flake.lock" ]; then
   if [ ! -s "flake.lock" ] || ! jq empty flake.lock >/dev/null 2>&1; then
     echo "flake.lock is empty or not valid JSON. Deleting and regenerating..."
     rm -f flake.lock # Use rm -f to avoid error if it was a broken symlink etc.
+    
+    # Clean up Nix cache before updating
+    rm -rf "$HOME/.cache/nix/tarball-cache"
+    fix_nix_permissions
+    
     nix flake update --log-format internal-json -v # Added verbosity and better log format for potential debug
   else
     echo "flake.lock found and appears to be valid JSON."
@@ -329,6 +353,11 @@ if [ -f "flake.lock" ]; then
   fi
 else
   echo "flake.lock not found. Generating a new one..."
+  
+  # Clean up Nix cache before updating
+  rm -rf "$HOME/.cache/nix/tarball-cache"
+  fix_nix_permissions
+  
   nix flake update --log-format internal-json -v # Added verbosity
 fi
 
