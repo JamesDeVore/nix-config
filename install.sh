@@ -69,16 +69,42 @@ log() {
 
 # Function to fix Nix cache permissions
 fix_nix_permissions() {
-  log "Fixing Nix cache permissions..."
+  log "Fixing Nix-related permissions..."
   
-  # Create cache directory if it doesn't exist
-  mkdir -p "$HOME/.cache/nix"
+  # List of directories to check and fix
+  local dirs=(
+    "$HOME/.nix-profile"
+    "$HOME/.nix-defexpr"
+    "$HOME/.cache/nix"
+    "$HOME/.local/state/nix"
+    "$HOME/.local/share/nix"
+  )
   
-  # Fix ownership of Nix cache directories
-  sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix"
-  sudo chmod -R 755 "$HOME/.cache/nix"
-  
-  echo "Nix cache permissions fixed."
+  # Create directories if they don't exist and fix permissions
+  for dir in "${dirs[@]}"; do
+    if [ ! -d "$dir" ]; then
+      echo "Creating directory: $dir"
+      mkdir -p "$dir"
+    fi
+    echo "Fixing permissions for: $dir"
+    sudo chown -R "$(id -u):$(id -g)" "$dir"
+    sudo chmod -R 755 "$dir"
+  done
+
+  # Special handling for nix-daemon directories if they exist
+  if [ -d "/nix" ]; then
+    echo "Fixing /nix directory permissions..."
+    sudo chown -R "$(id -u):$(id -g)" "/nix/var/nix/profiles/per-user/$USER"
+  fi
+
+  # Ensure the Nix store has correct permissions
+  if [ -d "/nix/store" ]; then
+    echo "Ensuring correct Nix store permissions..."
+    sudo chown -R root:nixbld /nix/store
+    sudo chmod -R 1775 /nix/store
+  fi
+
+  echo "Nix permissions fixed."
 }
 
 # --- Function to setup SSH keys ---
