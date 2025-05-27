@@ -87,9 +87,18 @@ fix_nix_permissions() {
   # Initialize a fresh tarball cache as a Git repository
   mkdir -p "$HOME/.cache/nix/tarball-cache"
   cd "$HOME/.cache/nix/tarball-cache"
+  
+  # Set the default branch name to main before initialization
+  git config --global init.defaultBranch main
+  
+  # Initialize the repository
   git init
+  
+  # Now that we're in a repo, set local configs
   git config --local user.email "nix-cache@localhost"
   git config --local user.name "Nix Cache"
+  
+  # Create and commit an initial file
   touch .keep
   git add .keep
   git commit -m "Initialize Nix tarball cache"
