@@ -67,6 +67,24 @@ log() {
   echo "--------------------------------------------------"
 }
 
+# Function to fix Nix cache permissions
+fix_nix_permissions() {
+  log "Fixing Nix cache permissions..."
+  
+  # Create cache directory if it doesn't exist
+  mkdir -p "$HOME/.cache/nix"
+  
+  # Fix ownership of Nix cache directories
+  sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix"
+  sudo chmod -R 755 "$HOME/.cache/nix"
+  
+  # Also ensure the tarball cache directory exists and has correct permissions
+  mkdir -p "$HOME/.cache/nix/tarball-cache"
+  sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix/tarball-cache"
+  
+  echo "Nix cache permissions fixed."
+}
+
 # --- Function to setup SSH keys ---
 setup_ssh_keys() {
   log "Setting up SSH keys for Git integration..."
@@ -354,22 +372,4 @@ echo "2. If you included the LunarVim auto-installer, run 'lvim' once manually t
 echo "3. Verify your tools and configurations are working as expected."
 
 exit 0
-
-# Function to fix Nix cache permissions
-fix_nix_permissions() {
-  log "Fixing Nix cache permissions..."
-  
-  # Create cache directory if it doesn't exist
-  mkdir -p "$HOME/.cache/nix"
-  
-  # Fix ownership of Nix cache directories
-  sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix"
-  sudo chmod -R 755 "$HOME/.cache/nix"
-  
-  # Also ensure the tarball cache directory exists and has correct permissions
-  mkdir -p "$HOME/.cache/nix/tarball-cache"
-  sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/nix/tarball-cache"
-  
-  echo "Nix cache permissions fixed."
-}
 
